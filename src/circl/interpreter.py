@@ -1,10 +1,11 @@
-from copy import copy
+
 import time
 import traceback
 from typing import cast
 from typing import NamedTuple
 from typing import Any
 
+from .parser import parse
 from .parser import parse
 from .circl import Circl
 from .instruction_set import instruction_set, Instruction
