@@ -43,7 +43,7 @@ def circl_gen(program: Program, open_quotes="", source_info: SourcecodeInfo = No
                 break
             else:
                 # Get new sub_circl and letters to be skipped
-                sub_circl, skipable_letters = circl_gen(
+                sub_circl, skip_to = circl_gen(
                     Program(full_source=program.full_source, offset=i+1),
                     open_quotes + char,
                     source_info = copy(source_info)
@@ -57,7 +57,7 @@ def circl_gen(program: Program, open_quotes="", source_info: SourcecodeInfo = No
 
                 # Cleanup
                 to_circl.append(sub_circl)
-                i += skipable_letters
+                i = skip_to
         else:
             to_add: int | str = char
             if char.isnumeric():
@@ -72,15 +72,14 @@ def circl_gen(program: Program, open_quotes="", source_info: SourcecodeInfo = No
     return (
         Circl(
             to_circl,
-            source_info
+            source_info=source_info
         ),
-        i + 1
+        i
     )   # push current circl
 
 
-def decode(program: str = ".") -> Circl:
-    main_circl, _ = circl_gen(Program(full_source=program, offset=0))
-    # print(main_circl)
+def decode(program: str = ".", file: str = "<stdin>") -> Circl:
+    main_circl, _ = circl_gen(Program(full_source=program, offset=0), "", SourcecodeInfo(file=file))
     print("Compiled a circl with radius ", main_circl.radius())
     return main_circl
 
