@@ -1,17 +1,38 @@
-import sys
+from copy import copy
 import time
 import traceback
+from typing import cast
+from typing import NamedTuple
 
 from .circl import Circl
 from .instruction_set import instruction_set, Instruction
 from .program import main_program
+from .source_info import SourcecodeInfo
 
+class Program(NamedTuple):
+    full_source: str
+    offset: int
 
-def circl_gen(program: str, open_quotes="") -> tuple[Circl, int]:
-    to_circl = []
-    last_substring_letter = -1
-    for i, char in enumerate(program):
-        if i <= last_substring_letter:
+# TODO: Move open_quotes into Program?
+def circl_gen(program: Program, open_quotes="", source_info: SourcecodeInfo = None) -> tuple[Circl, int]:
+    if source_info == None:
+        source_info = SourcecodeInfo(from_position=program.offset, to_position=program.offset)
+    to_circl: list[Circl, int, str] = []
+
+    i: int = program.offset
+    char: str
+    while True: # while in current circl
+        if i >= len(program.full_source):
+            break
+        char = program.full_source[i]
+        if char in ("\t", " "):
+            i += 1
+            source_info.to_position = i
+            continue
+        if char == "\n":
+            i += 1
+            source_info.to_position = 0
+            source_info.to_line += 1
             continue
         # TODO: add {} and () and [] for subcircles
         # TODO: make the quotes " ' ` put in a single string instead of a subcircle
@@ -19,23 +40,53 @@ def circl_gen(program: str, open_quotes="") -> tuple[Circl, int]:
         #
         if char in ('"', "'", "`"):
             if open_quotes and open_quotes[-1] is char:
-                return Circl(to_circl), i + 1  # push multicircl
+                break
             else:
+                # Get new sub_circl and letters to be skipped
                 sub_circl, skipable_letters = circl_gen(
-                    program[i + 1 :], open_quotes + char
+                    Program(full_source=program.full_source, offset=i+1),
+                    open_quotes + char,
+                    source_info = copy(source_info)
                 )
-                to_circl.append(sub_circl)
-                last_substring_letter = i + skipable_letters
-        else:
-            if char.isnumeric():
-                char = int(char)
-            to_circl.append(char)  # append to main circl
+                # typing shenanigans
+                sub_circl.source_info = cast(SourcecodeInfo, sub_circl.source_info)
 
-    return Circl(to_circl), len(program)
+                # Inform current circl of where we are now
+                source_info.from_line = sub_circl.source_info.to_line
+                source_info.from_position = sub_circl.source_info.to_position + 1
+
+                # Cleanup
+                to_circl.append(sub_circl)
+                i += skipable_letters
+        else:
+            to_add: int | str = char
+            if char.isnumeric():
+                to_add = int(to_add)
+
+            new_source = copy(source_info)
+            new_source.from_position = source_info.to_position
+            new_source.from_line = source_info.to_line
+
+            to_circl.append(
+                to_add,
+                new_source
+            )  # append to current circl
+
+        # Prepare for next iteration
+        i += 1
+        source_info.to_position = i
+
+    return (
+        Circl(
+            to_circl,
+            source_info
+        ),
+        i + 1
+    )   # push current circl
 
 
 def decode(program: str = ".") -> Circl:
-    main_circl, _ = circl_gen(program)
+    main_circl, _ = circl_gen(Program(full_source=program, offset=0))
     # print(main_circl)
     print("Compiled a circl with radius ", main_circl.radius())
     return main_circl
