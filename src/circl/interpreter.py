@@ -1,12 +1,38 @@
-import sys
+from copy import copy
 import time
 import traceback
+from typing import cast
+from typing import NamedTuple
 from typing import Any
-
 from .circl import Circl
 from .instruction_set import instruction_set, Instruction
 from .program import main_program
-from .parser import parse
+def circl_gen(program: str, open_quotes="") -> tuple[Circl, int]:
+    to_circl = []
+    last_substring_letter = -1
+    for i, char in enumerate(program):
+        if i <= last_substring_letter:
+            continue
+        # TODO: add {} and () and [] for subcircles
+        # TODO: make the quotes " ' ` put in a single string instead of a subcircle
+        # TODO: add \ for escaping characters
+        #
+        if char in ('"', "'", "`"):
+            if open_quotes and open_quotes[-1] is char:
+                return Circl(to_circl), i + 1  # push multicircl
+            else:
+                sub_circl, skipable_letters = circl_gen(
+                    program[i + 1 :], open_quotes + char
+                )
+                to_circl.append(sub_circl)
+                last_substring_letter = i + skipable_letters
+        else:
+            if char.isnumeric():
+                char = int(char)
+            to_circl.append(char)  # append to main circl
+
+    return Circl(to_circl), len(program)
+
 
 def decode(program: str = ".") -> Circl:
     main_circl = parse(program)
@@ -23,11 +49,10 @@ def execute(executing_circl) -> Any | None:
             main_program.remove_counter()
             if main_program.number_of_counters() == 0:
                 return executing_circl.stdout_copy
-            break
+            break # Change this later to return the return-value instead
+        current_step = main_program.get_counter()
+        command = executing_circl[current_step]
         try:
-            current_step = main_program.get_counter()
-            command = executing_circl[current_step]
-
             if isinstance(command, Circl) or command not in instruction_set.keys():
                 executing_circl.append(command)
             else:
@@ -38,10 +63,27 @@ def execute(executing_circl) -> Any | None:
                     instruction.operation(executing_circl, execute)
                 else:
                     instruction.operation(executing_circl)
-
+        
         except Exception as e:
-            traceback.print_exception(e)
-            print("An Exception, ", e, " occured. Pushing to stack and continuing")
+            if isinstance(command, Circl) and command.source_info is not None:
+                line_info: str
+                if command.source_info.from_line == command.source_info.to_line:
+                    line_info = f"line {command.source_info.from_line}"
+                else:
+                    line_info = f"lines {command.source_info.from_line} to {command.source_info.to_line}"
+
+                position_info: str
+                if command.source_info.from_position == command.source_info.to_position:
+                    position_info = f"at position {command.source_info.from_position}"
+                else:
+                    position_info = f"from {command.source_info.from_position} to {command.source_info.to_position}"
+
+                print(f"Exception in {command.source_info.file} on {line_info} {position_info}: {e}")
+            else:
+                print(f"Exception: {e}")
+            if main_program.verbose_exceptions:
+                traceback.print_stack()
+            print("Appending current exception to current circl")
             executing_circl.append(str(e))
 
         main_program.increment_counter()
