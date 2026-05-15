@@ -114,3 +114,5 @@ TODO: sort operators into groups like arithmetic, sets, logical, etc. for better
 | ↦        |                                | takes arguments b a, uses a as a variable id and stores the contents of b in the variable circle                                                                                    |
 | ↤        |                                | takes argument a and uses it as a variable id to retrieve it from the variable circle                                                                                               |
 | Я        | c_regex_match                  | takes 2 off the top of the stack, performs re.findall (if either operand is a circl, applies the operation for each) and returns the results on a circl <br/>                       |
+
+|∅        | c_noop                         | Does nothing (Noop)
